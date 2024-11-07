@@ -75,5 +75,97 @@ def delete_sales_data(sale_id):
 
 
 
+#####for regions table
 
 
+@sales.route('/show_regions')
+def show_regions():
+    connection = get_db()
+    query = "SELECT * FROM regions"
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        result = cursor.fetchall()
+    df = pd.DataFrame(result)
+    df['Actions'] = df['region_id'].apply(lambda id:
+      f'<a href="{url_for("sales.edit_region", region_id=id)}" class="btn btn-sm btn-info">Edit</a> '
+      f'<form action="{url_for("sales.delete_region", region_id=id)}" method="post" style="display:inline;">'
+      f'<button type="submit" class="btn btn-sm btn-danger">Delete</button></form>'
+      )
+    table_html = df.to_html(classes='dataframe table table-striped table-bordered', index=False, header=False, escape=False)
+    rows_only = table_html.split('<tbody>')[1].split('</tbody>')[0]
+
+    return render_template("regions.html", table=rows_only)
+
+@sales.route('/add_region', methods=['GET', 'POST'])
+def add_region():
+    if request.method == 'POST':
+        region_name = request.form['region_name']
+
+        connection = get_db()
+        query = "INSERT INTO regions (region_name) VALUES (%s)"
+        with connection.cursor() as cursor:
+            cursor.execute(query, (region_name,))
+        connection.commit()
+        flash("New region added successfully!", "success")
+        return redirect(url_for('regions.show_regions'))
+
+    return render_template("add_region.html")
+
+@sales.route('/edit_region/<int:region_id>', methods=['GET', 'POST'])
+def edit_region(region_id):
+    connection = get_db()
+    if request.method == 'POST':
+        region_name = request.form['region_name']
+
+        query = "UPDATE regions SET region_name = %s WHERE region_id = %s"
+        with connection.cursor() as cursor:
+            cursor.execute(query, (region_name, region_id))
+        connection.commit()
+        flash("Region updated successfully!", "success")
+        return redirect(url_for('regions.show_regions'))
+
+    query = "SELECT * FROM regions WHERE region_id = %s"
+    with connection.cursor() as cursor:
+        cursor.execute(query, (region_id,))
+        region = cursor.fetchone()
+
+    return render_template("edit_region.html", region=region)
+
+@sales.route('/delete_region/<int:region_id>', methods=['POST'])
+def delete_region(region_id):
+    connection = get_db()
+    query = "DELETE FROM regions WHERE region_id = %s"
+    with connection.cursor() as cursor:
+        cursor.execute(query, (region_id,))
+    connection.commit()
+    flash("Region deleted successfully!", "success")
+    return redirect(url_for('regions.show_regions'))
+
+
+
+# Reports route
+@sales.route('/reports')
+def show_reports():
+    connection = get_db()
+
+    # Total Sales by Region
+    query = "SELECT region_id, SUM(amount) as total_sales FROM sales_data GROUP BY region_id"
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        result = cursor.fetchall()
+    df_total_sales_by_region = pd.DataFrame(result)
+    total_sales_by_region_html = df_total_sales_by_region.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+
+    # Monthly Sales Trend
+    query = "SELECT DATE_FORMAT(sale_date, '%Y-%m') as month, SUM(amount) as total_sales FROM sales_data GROUP BY month ORDER BY month"
+    with connection.cursor() as cursor:
+        cursor.execute(query)
+        result = cursor.fetchall()
+    df_monthly_sales_trend = pd.DataFrame(result)
+    monthly_sales_trend_html = df_monthly_sales_trend.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+
+    # Top-Performing Region
+    top_performing_region = df_total_sales_by_region.loc[df_total_sales_by_region['total_sales'].idxmax()]
+    top_performing_region_html = top_performing_region.to_frame().T.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+
+    return render_template("reports.html", total_sales_by_region=total_sales_by_region_html, monthly_sales_trend=monthly_sales_trend_html, top_performing_region=top_performing_region_html)
