@@ -14,9 +14,9 @@ def show_sales():
         cursor.execute(query)
         result = cursor.fetchall()
     df = pd.DataFrame(result)
-    df['Actions'] = df['sales_data_id'].apply(lambda id:
-      f'<a href="{url_for("sales.edit_sales_data", sales_data_id=id)}" class="btn btn-sm btn-info">Edit</a> '
-      f'<form action="{url_for("sales.delete_sales_data", sales_data_id=id)}" method="post" style="display:inline;">'
+    df['Actions'] = df['sale_id'].apply(lambda id:
+      f'<a href="{url_for("sales.edit_sales_data", sale_id=id)}" class="btn btn-sm btn-info">Edit</a> '
+      f'<form action="{url_for("sales.delete_sales_data", sale_id=id)}" method="post" style="display:inline;">'
       f'<button type="submit" class="btn btn-sm btn-danger">Delete</button></form>'
       )
     table_html = df.to_html(classes='dataframe table table-striped table-bordered', index=False, header=False, escape=False)
@@ -41,37 +41,39 @@ def add_sales_data():
 
     return render_template("add_sales_data.html")
 
-@sales.route('/edit_sales_data/<int:sales_data_id>', methods=['GET', 'POST'])
-def edit_sales_data(sales_data_id):
+@sales.route('/edit_sales_data/<int:sale_id>', methods=['GET', 'POST'])
+def edit_sales_data(sale_id):
     connection = get_db()
     if request.method == 'POST':
         monthly_amount = request.form['monthly_amount']
         date = request.form['date']
         region = request.form['region']
 
-        query = "UPDATE sales_data SET monthly_amount = %s, date = %s, region = %s WHERE sales_data_id = %s"
+        query = "UPDATE sales_data SET monthly_amount = %s, date = %s, region = %s WHERE sale_id = %s"
         with connection.cursor() as cursor:
-            cursor.execute(query, (monthly_amount, date, region, sales_data_id))
+            cursor.execute(query, (monthly_amount, date, region, sale_id))
         connection.commit()
         flash("Sales data updated successfully!", "success")
         return redirect(url_for('sales.show_sales'))
 
-    query = "SELECT * FROM sales_data WHERE sales_data_id = %s"
+    query = "SELECT * FROM sales_data WHERE sale_id = %s"
     with connection.cursor() as cursor:
-        cursor.execute(query, (sales_data_id,))
+        cursor.execute(query, (sale_id,))
         sales_data = cursor.fetchone()
 
     return render_template("edit_sales_data.html", sales_data=sales_data)
 
-@sales.route('/delete_sales_data/<int:sales_data_id>', methods=['POST'])
-def delete_sales_data(sales_data_id):
+@sales.route('/delete_sales_data/<int:sale_id>', methods=['POST'])
+def delete_sales_data(sale_id):
     connection = get_db()
-    query = "DELETE FROM sales_data WHERE sales_data_id = %s"
+    query = "DELETE FROM sales_data WHERE sale_id = %s"
     with connection.cursor() as cursor:
-        cursor.execute(query, (sales_data_id,))
+        cursor.execute(query, (sale_id,))
     connection.commit()
     flash("Sales data deleted successfully!", "success")
-    return redirect(url_for('sales.show_sales'))
+    return redirect(url_for('sales.show_sales'))# In sales.py
+
+
 
 
 
