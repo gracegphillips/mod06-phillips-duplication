@@ -3,6 +3,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from app.db_connect import get_db
 import pandas as pd
+import matplotlib.pyplot as plt
+import io
+import base64
+from app.functions import calculate_total_sales_by_region, analyze_monthly_sales_trends, identify_top_performing_region
+
+
 
 sales = Blueprint('sales', __name__)
 
@@ -143,29 +149,56 @@ def delete_region(region_id):
 
 
 
+
+
 # Reports route
 @sales.route('/reports')
 def show_reports():
     connection = get_db()
 
     # Total Sales by Region
+    df_total_sales_by_region = calculate_total_sales_by_region(connection)
+    total_sales_by_region_html = df_total_sales_by_region.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+
+    # Monthly Sales Trend
+    df_monthly_sales_trend = analyze_monthly_sales_trends(connection)
+    monthly_sales_trend_html = df_monthly_sales_trend.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+
+    # Top-Performing Region
+    top_performing_region = identify_top_performing_region(df_total_sales_by_region)
+    top_performing_region_html = top_performing_region.to_frame().T.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+
+    return render_template("reports.html", total_sales_by_region=total_sales_by_region_html, monthly_sales_trend=monthly_sales_trend_html, top_performing_region=top_performing_region_html)
+
+
+
+
+# Visualization route
+@sales.route('/visualization')
+def show_visualization():
+    connection = get_db()
+
+    # Fetch sales data
     query = "SELECT region_id, SUM(amount) as total_sales FROM sales_data GROUP BY region_id"
     with connection.cursor() as cursor:
         cursor.execute(query)
         result = cursor.fetchall()
-    df_total_sales_by_region = pd.DataFrame(result)
-    total_sales_by_region_html = df_total_sales_by_region.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+    df = pd.DataFrame(result)
 
-    # Monthly Sales Trend
-    query = "SELECT DATE_FORMAT(sale_date, '%Y-%m') as month, SUM(amount) as total_sales FROM sales_data GROUP BY month ORDER BY month"
-    with connection.cursor() as cursor:
-        cursor.execute(query)
-        result = cursor.fetchall()
-    df_monthly_sales_trend = pd.DataFrame(result)
-    monthly_sales_trend_html = df_monthly_sales_trend.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+    # Generate bar chart
+    plt.figure(figsize=(10, 6))
+    plt.bar(df['region_id'], df['total_sales'], color='skyblue')
+    plt.xlabel('Region ID')
+    plt.ylabel('Total Sales')
+    plt.title('Total Sales by Region')
 
-    # Top-Performing Region
-    top_performing_region = df_total_sales_by_region.loc[df_total_sales_by_region['total_sales'].idxmax()]
-    top_performing_region_html = top_performing_region.to_frame().T.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
+    # Save the chart to a BytesIO object
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    plt.close()
+    img.seek(0)
 
-    return render_template("reports.html", total_sales_by_region=total_sales_by_region_html, monthly_sales_trend=monthly_sales_trend_html, top_performing_region=top_performing_region_html)
+    # Convert the BytesIO object to a base64 string
+    chart_base64 = base64.b64encode(img.getvalue()).decode('utf8')
+
+    return render_template("visualization.html", chart_base64=chart_base64)

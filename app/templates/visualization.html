@@ -1,0 +1,14 @@
+<!-- In app/templates/visualization.html -->
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Sales Visualization</h1>
+    <div class="container mt-4">
+        <h2>Total Sales by Region</h2>
+        <img src="data:image/png;base64,{{ chart_base64 }}" alt="Total Sales by Region">
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
