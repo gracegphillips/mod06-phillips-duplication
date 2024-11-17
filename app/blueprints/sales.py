@@ -8,14 +8,16 @@ import io
 import base64
 from app.functions import calculate_total_sales_by_region, analyze_monthly_sales_trends, identify_top_performing_region
 
-
-
 sales = Blueprint('sales', __name__)
 
 @sales.route('/show_sales')
 def show_sales():
     connection = get_db()
-    query = "SELECT * FROM sales_data"
+    query = """
+    SELECT sales_data.*, regions.region_name
+    FROM sales_data
+    JOIN regions ON sales_data.region_id = regions.region_id
+    """
     with connection.cursor() as cursor:
         cursor.execute(query)
         result = cursor.fetchall()
@@ -35,12 +37,12 @@ def add_sales_data():
     if request.method == 'POST':
         monthly_amount = request.form['monthly_amount']
         date = request.form['date']
-        region = request.form['region']
+        region_id = request.form['region_id']
 
         connection = get_db()
-        query = "INSERT INTO sales_data (monthly_amount, date, region) VALUES (%s, %s, %s)"
+        query = "INSERT INTO sales_data (monthly_amount, date, region_id) VALUES (%s, %s, %s)"
         with connection.cursor() as cursor:
-            cursor.execute(query, (monthly_amount, date, region))
+            cursor.execute(query, (monthly_amount, date, region_id))
         connection.commit()
         flash("New sales data added successfully!", "success")
         return redirect(url_for('sales.show_sales'))
@@ -53,11 +55,11 @@ def edit_sales_data(sale_id):
     if request.method == 'POST':
         monthly_amount = request.form['monthly_amount']
         date = request.form['date']
-        region = request.form['region']
+        region_id = request.form['region_id']
 
-        query = "UPDATE sales_data SET monthly_amount = %s, date = %s, region = %s WHERE sale_id = %s"
+        query = "UPDATE sales_data SET monthly_amount = %s, date = %s, region_id = %s WHERE sale_id = %s"
         with connection.cursor() as cursor:
-            cursor.execute(query, (monthly_amount, date, region, sale_id))
+            cursor.execute(query, (monthly_amount, date, region_id, sale_id))
         connection.commit()
         flash("Sales data updated successfully!", "success")
         return redirect(url_for('sales.show_sales'))
@@ -77,12 +79,9 @@ def delete_sales_data(sale_id):
         cursor.execute(query, (sale_id,))
     connection.commit()
     flash("Sales data deleted successfully!", "success")
-    return redirect(url_for('sales.show_sales'))# In sales.py
-
-
+    return redirect(url_for('sales.show_sales'))
 
 #####for regions table
-
 
 @sales.route('/show_regions')
 def show_regions():
@@ -113,7 +112,7 @@ def add_region():
             cursor.execute(query, (region_name,))
         connection.commit()
         flash("New region added successfully!", "success")
-        return redirect(url_for('regions.show_regions'))
+        return redirect(url_for('sales.show_regions'))
 
     return render_template("add_region.html")
 
@@ -128,7 +127,7 @@ def edit_region(region_id):
             cursor.execute(query, (region_name, region_id))
         connection.commit()
         flash("Region updated successfully!", "success")
-        return redirect(url_for('regions.show_regions'))
+        return redirect(url_for('sales.show_regions'))
 
     query = "SELECT * FROM regions WHERE region_id = %s"
     with connection.cursor() as cursor:
@@ -145,11 +144,7 @@ def delete_region(region_id):
         cursor.execute(query, (region_id,))
     connection.commit()
     flash("Region deleted successfully!", "success")
-    return redirect(url_for('regions.show_regions'))
-
-
-
-
+    return redirect(url_for('sales.show_regions'))
 
 # Reports route
 @sales.route('/reports')
@@ -169,9 +164,6 @@ def show_reports():
     top_performing_region_html = top_performing_region.to_frame().T.to_html(classes='dataframe table table-striped table-bordered', index=False, escape=False)
 
     return render_template("reports.html", total_sales_by_region=total_sales_by_region_html, monthly_sales_trend=monthly_sales_trend_html, top_performing_region=top_performing_region_html)
-
-
-
 
 # Visualization route
 @sales.route('/visualization')
