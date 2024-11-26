@@ -171,7 +171,7 @@ def show_visualization():
     connection = get_db()
 
     # Fetch sales data
-    query = "SELECT region_id, SUM(amount) as total_sales FROM sales_data GROUP BY region_id"
+    query = "SELECT region_id, SUM(monthly_amount) as total_sales FROM sales_data GROUP BY region_id"
     with connection.cursor() as cursor:
         cursor.execute(query)
         result = cursor.fetchall()
